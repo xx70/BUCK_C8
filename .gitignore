@@ -1,0 +1,18 @@
+# Keil/MDK build products and per-user IDE settings
+MDK-ARM/DebugConfig/
+MDK-ARM/*/
+MDK-ARM/*.axf
+MDK-ARM/*.hex
+MDK-ARM/*.bin
+MDK-ARM/*.map
+MDK-ARM/*.lst
+MDK-ARM/*.htm
+MDK-ARM/*.build_log.htm
+MDK-ARM/*.uvguix.*
+MDK-ARM/*.uvoptx
+
+# Editor and operating-system files
+.vscode/
+*.bak
+*.tmp
+Thumbs.db
