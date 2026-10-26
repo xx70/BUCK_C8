@@ -1,8 +1,8 @@
 #MicroXplorer Configuration settings - do not modify
 ADC1.Channel-0\#ChannelRegularConversion=ADC_CHANNEL_0
-ADC1.Channel-1\#ChannelRegularConversion=ADC_CHANNEL_0
-ADC1.Channel-2\#ChannelRegularConversion=ADC_CHANNEL_0
-ADC1.Channel-3\#ChannelRegularConversion=ADC_CHANNEL_0
+ADC1.Channel-1\#ChannelRegularConversion=ADC_CHANNEL_1
+ADC1.Channel-2\#ChannelRegularConversion=ADC_CHANNEL_2
+ADC1.Channel-3\#ChannelRegularConversion=ADC_CHANNEL_3
 ADC1.DataAlign=ADC_DATAALIGN_RIGHT
 ADC1.ExternalTrigConv=ADC_SOFTWARE_START
 ADC1.IPParameters=Rank-0\#ChannelRegularConversion,Channel-0\#ChannelRegularConversion,SamplingTime-0\#ChannelRegularConversion,NbrOfConversionFlag,master,NbrOfConversion,ExternalTrigConv,DataAlign,Rank-1\#ChannelRegularConversion,Channel-1\#ChannelRegularConversion,SamplingTime-1\#ChannelRegularConversion,Rank-2\#ChannelRegularConversion,Channel-2\#ChannelRegularConversion,SamplingTime-2\#ChannelRegularConversion,Rank-3\#ChannelRegularConversion,Channel-3\#ChannelRegularConversion,SamplingTime-3\#ChannelRegularConversion
@@ -12,10 +12,10 @@ ADC1.Rank-0\#ChannelRegularConversion=1
 ADC1.Rank-1\#ChannelRegularConversion=2
 ADC1.Rank-2\#ChannelRegularConversion=3
 ADC1.Rank-3\#ChannelRegularConversion=4
-ADC1.SamplingTime-0\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5
-ADC1.SamplingTime-1\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5
-ADC1.SamplingTime-2\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5
-ADC1.SamplingTime-3\#ChannelRegularConversion=ADC_SAMPLETIME_1CYCLE_5
+ADC1.SamplingTime-0\#ChannelRegularConversion=ADC_SAMPLETIME_13CYCLES_5
+ADC1.SamplingTime-1\#ChannelRegularConversion=ADC_SAMPLETIME_13CYCLES_5
+ADC1.SamplingTime-2\#ChannelRegularConversion=ADC_SAMPLETIME_13CYCLES_5
+ADC1.SamplingTime-3\#ChannelRegularConversion=ADC_SAMPLETIME_13CYCLES_5
 ADC1.master=1
 CAD.formats=
 CAD.pinconfig=

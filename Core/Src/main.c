@@ -34,7 +34,23 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+#define ADC_FULL_SCALE          4095.0f
+#define ADC_REFERENCE_VOLTAGE   3.3f
+#define VOLTAGE_DIVIDER_RATIO   30.0f
 
+#define VOUT_TARGET_V           12.0f
+#define VOUT_OVERVOLTAGE_V      13.5f
+
+#define PWM_PERIOD_COUNTS       720.0f
+#define DUTY_MIN                0.00f
+#define DUTY_MAX                0.60f
+#define DUTY_START              0.00f
+
+/* The voltage loop runs at 1 kHz. Tune these values on the real hardware. */
+#define VOLTAGE_KP              0.015f
+#define VOLTAGE_KI              0.40f
+#define CONTROL_PERIOD_S        0.001f
+#define SOFT_START_STEP_V       0.024f
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -45,18 +61,142 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static uint16_t adc_raw[4];
+static float vin_measured;
+static float vout_measured;
+static float vout_reference;
+static float voltage_integrator;
+static float duty_command = DUTY_START;
+static uint8_t buck_fault;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+static uint8_t ADC_ReadSequence(uint16_t *result);
+static void Buck_SetDuty(float duty);
+static void Buck_Stop(void);
+static void Buck_VoltageControl(void);
+static void OLED_UpdateStatus(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static float Clamp(float value, float lower, float upper)
+{
+  if (value < lower)
+  {
+    return lower;
+  }
+  if (value > upper)
+  {
+    return upper;
+  }
+  return value;
+}
 
+static uint8_t ADC_ReadSequence(uint16_t *result)
+{
+  uint8_t index;
+
+  if (HAL_ADC_Start(&hadc1) != HAL_OK)
+  {
+    return 0U;
+  }
+
+  for (index = 0U; index < 4U; index++)
+  {
+    if (HAL_ADC_PollForConversion(&hadc1, 1U) != HAL_OK)
+    {
+      (void)HAL_ADC_Stop(&hadc1);
+      return 0U;
+    }
+    result[index] = (uint16_t)HAL_ADC_GetValue(&hadc1);
+  }
+
+  (void)HAL_ADC_Stop(&hadc1);
+  return 1U;
+}
+
+static void Buck_SetDuty(float duty)
+{
+  uint32_t compare;
+
+  duty = Clamp(duty, DUTY_MIN, DUTY_MAX);
+  compare = (uint32_t)(duty * PWM_PERIOD_COUNTS + 0.5f);
+  __HAL_TIM_SET_COMPARE(&htim1, TIM_CHANNEL_1, compare);
+}
+
+static void Buck_Stop(void)
+{
+  (void)HAL_TIM_PWM_Stop(&htim1, TIM_CHANNEL_1);
+  (void)HAL_TIMEx_PWMN_Stop(&htim1, TIM_CHANNEL_1);
+}
+
+static void Buck_VoltageControl(void)
+{
+  float error;
+  float duty_feedforward;
+
+  if (ADC_ReadSequence(adc_raw) == 0U)
+  {
+    buck_fault = 1U;
+    Buck_Stop();
+    return;
+  }
+
+  /* PA0 and PA1 are PADOUT1 and PADOUT2, each divided by about 30. */
+  vin_measured = ((float)adc_raw[0] * ADC_REFERENCE_VOLTAGE /
+                  ADC_FULL_SCALE) * VOLTAGE_DIVIDER_RATIO;
+  vout_measured = ((float)adc_raw[1] * ADC_REFERENCE_VOLTAGE /
+                   ADC_FULL_SCALE) * VOLTAGE_DIVIDER_RATIO;
+
+  if (vout_measured > VOUT_OVERVOLTAGE_V)
+  {
+    buck_fault = 1U;
+    Buck_Stop();
+    return;
+  }
+
+  if (vout_reference < VOUT_TARGET_V)
+  {
+    vout_reference += SOFT_START_STEP_V;
+    if (vout_reference > VOUT_TARGET_V)
+    {
+      vout_reference = VOUT_TARGET_V;
+    }
+  }
+
+  if (vin_measured < 1.0f)
+  {
+    buck_fault = 1U;
+    Buck_Stop();
+    return;
+  }
+
+  error = vout_reference - vout_measured;
+  voltage_integrator += VOLTAGE_KI * error * CONTROL_PERIOD_S;
+  voltage_integrator = Clamp(voltage_integrator, -0.20f, 0.20f);
+
+  duty_feedforward = vout_reference / vin_measured;
+  duty_command = duty_feedforward + VOLTAGE_KP * error + voltage_integrator;
+  duty_command = Clamp(duty_command, DUTY_MIN, DUTY_MAX);
+  Buck_SetDuty(duty_command);
+}
+
+static void OLED_UpdateStatus(void)
+{
+  OLED_ShowString(0, 0, (uint8_t *)"VIN:", 16);
+  OLED_ShowFolatNum(40, 0, vin_measured, 4, 16);
+  OLED_ShowString(80, 0, (uint8_t *)"V", 16);
+  OLED_ShowString(0, 2, (uint8_t *)"VOUT:", 16);
+  OLED_ShowFolatNum(48, 2, vout_measured, 4, 16);
+  OLED_ShowString(88, 2, (uint8_t *)"V", 16);
+  OLED_ShowString(0, 4, (uint8_t *)"DUTY:", 16);
+  OLED_ShowFolatNum(48, 4, duty_command * 100.0f, 4, 16);
+  OLED_ShowString(88, 4, (uint8_t *)"%", 16);
+  OLED_ShowString(0, 6, (uint8_t *)(buck_fault ? "FAULT" : "VLOOP"), 16);
+}
 /* USER CODE END 0 */
 
 /**
@@ -92,9 +232,17 @@ int main(void)
   /* USER CODE BEGIN 2 */
 	OLED_Init();
 	
-	HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);       // 启动主通道 PA8
-	HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1);    // 启动互补通道 PA7，同时使能MOE
-	OLED_ShowNum(0,0,1,1,1);
+	if (HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)
+	{
+	  Error_Handler();
+	}
+	if (HAL_TIMEx_PWMN_Start(&htim1, TIM_CHANNEL_1) != HAL_OK)
+	{
+	  Error_Handler();
+	}
+	Buck_SetDuty(DUTY_START);
+	OLED_Clear(0x00);
+	OLED_UpdateStatus();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -104,6 +252,24 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
+    static uint32_t control_tick;
+    static uint32_t oled_tick;
+    uint32_t now = HAL_GetTick();
+
+    if ((now - control_tick) >= 1U)
+    {
+      control_tick = now;
+      if (buck_fault == 0U)
+      {
+        Buck_VoltageControl();
+      }
+    }
+
+    if ((now - oled_tick) >= 200U)
+    {
+      oled_tick = now;
+      OLED_UpdateStatus();
+    }
   }
   /* USER CODE END 3 */
 }
